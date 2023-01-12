@@ -9,6 +9,7 @@
 import AmazonChimeSDK
 import AVFoundation
 import UIKit
+import WatchRTC_SDK
 
 class MeetingModel: NSObject {
     enum ActiveMode {
@@ -131,6 +132,9 @@ class MeetingModel: NSObject {
     var isMutedHandler: ((Bool) -> Void)?
     var isEndedHandler: (() -> Void)?
 
+    // WatchRTC
+    private var watchRtc: WatchRTC?
+    
     init(meetingSessionConfig: MeetingSessionConfiguration,
          meetingId: String,
          primaryMeetingId: String,
@@ -156,8 +160,20 @@ class MeetingModel: NSObject {
         } else if callKitOption == .outgoing {
             call = createCall(isOutgoing: true)
         }
+        
+        self.setupWatchRTC()
     }
 
+    private func setupWatchRTC() {
+        let con: WatchRTCConfig = WatchRTCConfig(rtcApiKey: "staging:6d3873f0-f06e-4aea-9a25-1a959ab988cc", rtcRoomId: "YOUR_ROOM_ID", keys: ["company":["YOUR_COMPANY_NAME"]])
+        self.watchRtc = WatchRTC(dataProvider: self)
+        guard let watchRtc = self.watchRtc else {
+            debugPrint("error with watchRtc initialization")
+            return
+        }
+        watchRtc.setConfig(config: con)
+    }
+    
     func bind(videoRenderView: VideoRenderView, tileId: Int) {
         currentMeetingSession.audioVideo.bindVideoView(videoView: videoRenderView, tileId: tileId)
     }
@@ -384,15 +400,21 @@ extension MeetingModel: AudioVideoObserver {
     func connectionDidRecover() {
         notifyHandler?("Connection quality has recovered")
         logWithFunctionName()
+        
+        watchRtc?.addEvent(name: "connectionDidRecover", type: EventType.global)
     }
 
     func connectionDidBecomePoor() {
         notifyHandler?("Connection quality has become poor")
         logWithFunctionName()
+        
+        watchRtc?.addEvent(name: "connectionDidBecomePoor", type: EventType.global)
     }
 
     func videoSessionDidStopWithStatus(sessionStatus: MeetingSessionStatus) {
         logWithFunctionName(message: "\(sessionStatus.statusCode)")
+        
+        watchRtc?.addEvent(name: "videoSessionDidStopWithStatus", type: EventType.global, parameters: ["sessionStatus": sessionStatus.statusCode.rawValue])
     }
 
     func audioSessionDidStartConnecting(reconnecting: Bool) {
@@ -401,6 +423,8 @@ extension MeetingModel: AudioVideoObserver {
         if !reconnecting {
             call?.isConnectingHandler?()
         }
+        
+        watchRtc?.addEvent(name: "audioSessionDidStartConnecting", type: EventType.global, parameters: ["reconnecting": reconnecting])
     }
 
     func audioSessionDidStart(reconnecting: Bool) {
@@ -410,7 +434,17 @@ extension MeetingModel: AudioVideoObserver {
         setVoiceFocusEnabled(enabled: true)
         if !reconnecting {
             call?.isConnectedHandler?()
+            
+            do
+            {
+                try watchRtc?.connect()
+                watchRtc?.setUserRating(rating: 4, ratingComment: "Put your rating value")
+            } catch {
+                debugPrint(error)
+            }
         }
+        
+        watchRtc?.addEvent(name: "audioSessionDidStart", type: EventType.global, parameters: ["reconnecting": reconnecting])
 
         // This selection has to be here because if there are bluetooth headset connected,
         // selecting non-bluetooth device before audioVideo.start() will get route overwritten by bluetooth
@@ -421,11 +455,17 @@ extension MeetingModel: AudioVideoObserver {
     func audioSessionDidDrop() {
         notifyHandler?("Audio Session Dropped")
         logWithFunctionName()
+        
+        watchRtc?.addEvent(name: "audioSessionDidDrop", type: EventType.global)
     }
 
     func audioSessionDidStopWithStatus(sessionStatus: MeetingSessionStatus) {
         logWithFunctionName(message: "\(sessionStatus.statusCode)")
 
+        watchRtc?.addEvent(name: "audioSessionDidStopWithStatus", type: EventType.global, parameters: ["sessionStatus": sessionStatus.statusCode.rawValue])
+
+        watchRtc?.disconnect()
+        
         removeAudioVideoFacadeObservers()
         if let call = call {
             switch sessionStatus.statusCode {
@@ -449,10 +489,14 @@ extension MeetingModel: AudioVideoObserver {
     func audioSessionDidCancelReconnect() {
         notifyHandler?("Audio cancelled reconnecting")
         logWithFunctionName()
+        
+        watchRtc?.addEvent(name: "audioSessionDidCancelReconnect", type: EventType.global)
     }
 
     func videoSessionDidStartConnecting() {
         logWithFunctionName()
+        
+        watchRtc?.addEvent(name: "videoSessionDidStartConnecting", type: EventType.global)
     }
     
     func remoteVideoSourcesDidBecomeAvailable(sources: [RemoteVideoSource]) {
@@ -462,6 +506,8 @@ extension MeetingModel: AudioVideoObserver {
             videoModel.remoteVideoSourceConfigurations[source] = VideoSubscriptionConfiguration()
         }
         // Use default auto-subscribe behavior
+        
+        watchRtc?.addEvent(name: "remoteVideoSourcesDidBecomeAvailable", type: EventType.global)
     }
     
     func remoteVideoSourcesDidBecomeUnavailable(sources: [RemoteVideoSource]) {
@@ -470,6 +516,8 @@ extension MeetingModel: AudioVideoObserver {
             videoModel.remoteVideoSourceConfigurations.removeValue(forKey: source)
         }
         videoModel.audioVideoFacade.updateVideoSourceSubscriptions(addedOrUpdated: [:], removed: sources)
+        
+        watchRtc?.addEvent(name: "remoteVideoSourcesDidBecomeUnavailable", type: EventType.global)
     }
 
     func videoSessionDidStartWithStatus(sessionStatus: MeetingSessionStatus) {
@@ -481,11 +529,15 @@ extension MeetingModel: AudioVideoObserver {
         default:
             logWithFunctionName(message: "\(sessionStatus.statusCode)")
         }
+        
+        watchRtc?.addEvent(name: "videoSessionDidStartWithStatus", type: EventType.global, parameters: ["sessionStatus": sessionStatus.statusCode.rawValue])
     }
     
     func cameraSendAvailabilityDidChange(available : Bool) {
         logWithFunctionName(message: "Camera Send Available: \(available)")
         videoModel.cameraSendIsAvailable = available
+        
+        watchRtc?.addEvent(name: "cameraSendAvailabilityDidChange", type: EventType.global)
     }
 }
 
@@ -532,11 +584,15 @@ extension MeetingModel: RealtimeObserver {
         if activeMode == .roster {
             rosterModel.rosterUpdatedHandler?()
         }
+        
+        watchRtc?.addEvent(name: "attendeesDidJoinWithStatus", type: EventType.global, parameters: ["sessionStatus": status.rawValue])
     }
 
     func attendeesDidLeave(attendeeInfo: [AttendeeInfo]) {
         logAttendee(attendeeInfo: attendeeInfo, action: "Left")
         removeAttendeesAndReload(attendeeInfo: attendeeInfo)
+        
+        watchRtc?.addEvent(name: "attendeesDidLeave", type: EventType.global)
     }
 
     func attendeesDidDrop(attendeeInfo: [AttendeeInfo]) {
@@ -545,6 +601,8 @@ extension MeetingModel: RealtimeObserver {
         }
 
         removeAttendeesAndReload(attendeeInfo: attendeeInfo)
+        
+        watchRtc?.addEvent(name: "attendeesDidDrop", type: EventType.global)
     }
 
     func attendeesDidMute(attendeeInfo: [AttendeeInfo]) {
@@ -578,6 +636,8 @@ extension MeetingModel: RealtimeObserver {
 
     func attendeesDidJoin(attendeeInfo: [AttendeeInfo]) {
         attendeesDidJoinWithStatus(attendeeInfo: attendeeInfo, status: AttendeeStatus.joined)
+        
+        watchRtc?.addEvent(name: "attendeesDidJoin", type: EventType.global)
     }
 }
 
@@ -771,5 +831,11 @@ extension MeetingModel: EventAnalyticsObserver {
 extension MeetingModel: TranscriptEventObserver {
     func transcriptEventDidReceive(transcriptEvent: TranscriptEvent) {
         captionsModel.addTranscriptEvent(transcriptEvent: transcriptEvent)
+    }
+}
+
+extension MeetingModel: RtcDataProvider {
+    func getStats(callback: @escaping (RTCStatsReport) -> Void) {
+        // TODO: - Implement stats retrieving
     }
 }

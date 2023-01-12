@@ -27,6 +27,7 @@
 		5A1DE366249332870060E9C3 /* ViewControllerExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A1DE365249332870060E9C3 /* ViewControllerExtension.swift */; };
 		5A38BFB724A131B3005B2AA7 /* MetricsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A38BFB624A131B3005B2AA7 /* MetricsModel.swift */; };
 		5A81417823F2300D00560201 /* RosterTableCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A81417723F2300D00560201 /* RosterTableCell.swift */; };
+		A8055246290A89540006974B /* WatchRTC_SDK in Frameworks */ = {isa = PBXBuildFile; productRef = A8055245290A89540006974B /* WatchRTC_SDK */; };
 		A87F152229046CC000BE6601 /* AmazonChimeSDK.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = A8A45A6D29046B8B00D319CA /* AmazonChimeSDK.xcframework */; };
 		A87F152329046CC000BE6601 /* AmazonChimeSDK.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = A8A45A6D29046B8B00D319CA /* AmazonChimeSDK.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A87F152629046CC400BE6601 /* AmazonChimeSDKMedia.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = A8A45A6C29046B8B00D319CA /* AmazonChimeSDKMedia.xcframework */; };
@@ -146,6 +147,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A87F152629046CC400BE6601 /* AmazonChimeSDKMedia.xcframework in Frameworks */,
+				A8055246290A89540006974B /* WatchRTC_SDK in Frameworks */,
 				00F0F6E12411B8E20013DA25 /* Toast in Frameworks */,
 				A87F152229046CC000BE6601 /* AmazonChimeSDK.xcframework in Frameworks */,
 			);
@@ -273,6 +275,7 @@
 			name = AmazonChimeSDKDemo;
 			packageProductDependencies = (
 				00F0F6E02411B8E20013DA25 /* Toast */,
+				A8055245290A89540006974B /* WatchRTC_SDK */,
 			);
 			productName = AmazonChimeSDKDemo;
 			productReference = 5A1582B623C40C9B0099F8FA /* AmazonChimeSDKDemo.app */;
@@ -305,6 +308,7 @@
 			mainGroup = 5A1582AD23C40C9B0099F8FA;
 			packageReferences = (
 				00F0F6DF2411B8E20013DA25 /* XCRemoteSwiftPackageReference "Toast-Swift" */,
+				A8055244290A89540006974B /* XCRemoteSwiftPackageReference "watchRTCSDK-iOS" */,
 			);
 			productRefGroup = 5A1582B723C40C9B0099F8FA /* Products */;
 			projectDirPath = "";
@@ -659,6 +663,14 @@
 				minimumVersion = 5.0.1;
 			};
 		};
+		A8055244290A89540006974B /* XCRemoteSwiftPackageReference "watchRTCSDK-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/testRTC/watchRTCSDK-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.3.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -666,6 +678,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 00F0F6DF2411B8E20013DA25 /* XCRemoteSwiftPackageReference "Toast-Swift" */;
 			productName = Toast;
+		};
+		A8055245290A89540006974B /* WatchRTC_SDK */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A8055244290A89540006974B /* XCRemoteSwiftPackageReference "watchRTCSDK-iOS" */;
+			productName = WatchRTC_SDK;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
