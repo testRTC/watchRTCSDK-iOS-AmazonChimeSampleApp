@@ -134,6 +134,7 @@ class MeetingModel: NSObject {
 
     // WatchRTC
     private var watchRtc: WatchRTC?
+    private var rtcStatsReportCallback: ((RTCStatsReport) -> Void)?
     
     init(meetingSessionConfig: MeetingSessionConfiguration,
          meetingId: String,
@@ -161,11 +162,40 @@ class MeetingModel: NSObject {
             call = createCall(isOutgoing: true)
         }
         
+        //self.swizzleMetricsMethods()
         self.setupWatchRTC()
     }
-
+    
+//    private func swizzleMetricsMethods() {
+//        let originalAudioSelector = NSSelectorFromString("processAudioClientMetricsWithMetrics:")
+//        let originalVideoSelector = NSSelectorFromString("processVideoClientMetricsWithMetrics:")
+//        let defaultClientMetricsCollector: AnyClass = NSClassFromString("AmazonChimeSDK.DefaultClientMetricsCollector")!
+//
+//        let originalAudioMethod = class_getInstanceMethod(defaultClientMetricsCollector.self, originalAudioSelector)
+//        let swizzledAudioMethod = class_getInstanceMethod(MeetingModel.self, #selector(processAudioClientMetrics(metrics:)))
+//
+//        method_exchangeImplementations(originalAudioMethod!, swizzledAudioMethod!)
+//
+//        let originalVideoMethod = class_getInstanceMethod(defaultClientMetricsCollector.self, originalVideoSelector)
+//        let swizzledVideoMethod = class_getInstanceMethod(MeetingModel.self, #selector(processVideoClientMetrics(metrics:)))
+//
+//        method_exchangeImplementations(originalVideoMethod!, swizzledVideoMethod!)
+//    }
+//
+//    @objc private func processAudioClientMetrics(metrics: [AnyHashable: Any]) {
+//        print("Audio metrics: \(metrics)")
+//    }
+//    
+//    @objc private func processVideoClientMetrics(metrics: [AnyHashable: Any]) {
+//        print("Video metrics: \(metrics)")
+//    }
+    
     private func setupWatchRTC() {
-        let con: WatchRTCConfig = WatchRTCConfig(rtcApiKey: "staging:6d3873f0-f06e-4aea-9a25-1a959ab988cc", rtcRoomId: "YOUR_ROOM_ID", keys: ["company":["YOUR_COMPANY_NAME"]])
+        let con: WatchRTCConfig = WatchRTCConfig(
+            rtcApiKey: "staging:6d3873f0-f06e-4aea-9a25-1a959ab988cc",
+            rtcRoomId: "CHIME_22122022_1647",
+            rtcPeerId: "CHIME_22122022_1647_1",
+            keys: ["company":["YULIAN_CHIME_TEST"]])
         self.watchRtc = WatchRTC(dataProvider: self)
         guard let watchRtc = self.watchRtc else {
             debugPrint("error with watchRtc initialization")
@@ -654,6 +684,50 @@ extension MeetingModel: MetricsObserver {
         if activeMode == .metrics {
             metricsModel.metricsUpdatedHandler?()
         }
+        
+        
+        let count = self.videoModel.videoTileCount
+        
+        var reports: [String: Any] = [:]
+        
+        (0..<count).forEach { index in
+            print("index: \(index)")
+            guard let tileState = self.videoModel.getVideoTileState(for: IndexPath(item: index, section: 0)), !tileState.isLocalTile, !tileState.isContent else { return }
+            
+            let outboundV = WatchRTCStatsTransformHelper.createOutboundRTPReportForVideo(
+                tileState: tileState,
+                selectedVideoDevice: self.deviceSelectionModel.selectedVideoDevice,
+                selectedVideoFormat: self.deviceSelectionModel.selectedVideoFormat,
+                metrics: observableMetrics)
+            reports = outboundV
+            
+            let inboundV = WatchRTCStatsTransformHelper.createInboundRTPReportForVideo(tileState: tileState, metrics: observableMetrics)
+            reports.merge(inboundV) { (current, _) in current }
+            
+            //            print(outboundV)
+            //            print(inboundV)
+        }
+        
+        let timestamp = Int64(Date().timeIntervalSince1970*1000)
+        
+        var dict = [String: RTCStat]()
+        
+        for (key, value) in reports {
+            guard let valueDict = value as? [String: Any] else { continue }
+            let statTimestamp = valueDict["timestamp"] as? Int64 ?? Int64(Date().timeIntervalSince1970*1000) // TODO: We don't actually have a timestamp in valueDict. Should we add?
+            let rtcStat = RTCStat(timestamp: statTimestamp, properties: valueDict)
+            dict[key] = rtcStat
+        }
+        
+        let rtcStatsReport = RTCStatsReport(report: dict, timestamp: timestamp)
+        
+        if rtcStatsReportCallback != nil {
+            print("Sending stats")
+            
+            rtcStatsReportCallback?(rtcStatsReport)
+            
+            rtcStatsReportCallback = nil
+        }
     }
 }
 
@@ -836,6 +910,6 @@ extension MeetingModel: TranscriptEventObserver {
 
 extension MeetingModel: RtcDataProvider {
     func getStats(callback: @escaping (RTCStatsReport) -> Void) {
-        // TODO: - Implement stats retrieving
+        self.rtcStatsReportCallback = callback
     }
 }
